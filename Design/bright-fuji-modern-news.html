@@ -1,0 +1,351 @@
+
+<!doctype html>
+<html lang="ja">
+<head><script>(function(){
+  function makeStore(){
+    var data = {};
+    var api = {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null; },
+      setItem: function(k, v){ data[k] = String(v); },
+      removeItem: function(k){ delete data[k]; },
+      clear: function(){ data = {}; },
+      key: function(i){ return Object.keys(data)[i] || null; }
+    };
+    Object.defineProperty(api, 'length', { get: function(){ return Object.keys(data).length; } });
+    return api;
+  }
+  function tryShim(name){
+    var works = false;
+    try { works = !!window[name] && typeof window[name].getItem === 'function'; void window[name].length; }
+    catch (_) { works = false; }
+    if (works) return;
+    try { Object.defineProperty(window, name, { configurable: true, value: makeStore() }); }
+    catch (_) { try { window[name] = makeStore(); } catch (__) {} }
+  }
+  tryShim('localStorage');
+  tryShim('sessionStorage');
+})();</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAPAN NEWS // BRIGHT MODERN</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-pure: oklch(100% 0 0);
+            --fg: oklch(20% 0.01 100);
+            --surface: rgba(255, 255, 255, 0.92);
+            --border: oklch(90% 0.01 100);
+            --border-heavy: oklch(20% 0.01 100);
+            --accent: oklch(55% 0.22 25); /* Modern Hanko Red */
+            --muted: oklch(50% 0.02 100);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            
+            --font-main: "Inter", "Noto Sans JP", -apple-system, sans-serif;
+        }
+
+        [data-theme="dark"] {
+            --bg-pure: oklch(15% 0 0);
+            --fg: oklch(95% 0 0);
+            --surface: rgba(25px, 25px, 25px, 0.9);
+            --border: oklch(30% 0.01 100);
+            --border-heavy: oklch(95% 0.01 100);
+            --accent: oklch(65% 0.2 25);
+            --muted: oklch(70% 0 0);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-pure);
+            color: var(--fg);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            background-image: 
+                linear-gradient(to bottom, rgba(255,255,255,0.7), var(--bg-pure)),
+                url('https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1920&auto=format&fit=crop&sat=-100&bri=10');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            transition: background 0.3s;
+        }
+
+        .layout-wrapper {
+            max-width: 1300px;
+            margin: 40px auto;
+            display: grid;
+            grid-template-columns: 260px 1fr 300px;
+            gap: 24px;
+            padding: 0 20px;
+        }
+
+        /* Shared Panel Style */
+        .panel {
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+        }
+
+        /* Branding */
+        .brand-box {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            color: var(--fg);
+            text-transform: uppercase;
+        }
+        .logo span { color: var(--accent); }
+
+        /* Typography */
+        .eye-brow {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* Buttons - Rounded & Modern */
+        .btn-red {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-red:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 38, 38, 0.3);
+            filter: brightness(1.1);
+        }
+        .btn-red:active { transform: translateY(0); }
+
+        /* News Cards */
+        .news-item {
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            transition: 0.3s;
+        }
+        .news-item:last-child { border-bottom: none; }
+
+        .news-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            line-height: 1.25;
+            color: var(--fg);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 12px;
+            letter-spacing: -0.01em;
+        }
+        .news-title:hover { color: var(--accent); }
+
+        .news-desc {
+            font-size: 0.95rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        /* Sidebar Nav */
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            text-decoration: none;
+            color: var(--fg);
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: var(--radius-sm);
+            margin-bottom: 4px;
+            transition: 0.2s;
+        }
+        .nav-link:hover { background: rgba(0,0,0,0.04); }
+        .nav-link.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .status-pill {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            margin-right: 8px;
+        }
+
+        /* Utility */
+        .clock {
+            font-variant-numeric: tabular-nums;
+            font-weight: 800;
+            font-size: 0.9rem;
+        }
+
+        .hanko-stamp {
+            width: 44px;
+            height: 44px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+            font-weight: 900;
+            font-size: 1rem;
+            margin-top: 32px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 1024px) {
+            .layout-wrapper { grid-template-columns: 1fr; margin-top: 20px; }
+            .side-panel { display: none; }
+        }
+    </style>
+</head>
+<body data-theme="light">
+
+    <div class="layout-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="side-panel">
+            <div class="panel" style="position: sticky; top: 40px;">
+                <div class="brand-box">
+                    <h1 class="logo">JP<span>SOC</span> News</h1>
+                    <p style="font-size: 0.75rem; color: var(--muted); font-weight: 600;">SOCIAL MONITORING V2.4</p>
+                </div>
+                
+                <nav style="margin-top: 24px;">
+                    <a href="#" class="nav-link active">DASHBOARD</a>
+                    <a href="#" class="nav-link">SOCIETY</a>
+                    <a href="#" class="nav-link">ECONOMY</a>
+                    <a href="#" class="nav-link">LIFESTYLE</a>
+                    <a href="#" class="nav-link">OFFBEAT</a>
+                </nav>
+
+                <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border);">
+                    <button class="btn-red" onclick="toggleTheme()" style="width: 100%; justify-content: center; background: var(--fg); color: var(--bg-pure);">
+                        SWITCH THEME
+                    </button>
+                    <div class="hanko-stamp">日</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Feed -->
+        <main>
+            <div class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; border-bottom: 2px solid var(--border); padding-bottom: 16px;">
+                    <h2 style="font-size: 1rem; text-transform: uppercase; font-weight: 800;">Latest Society Updates</h2>
+                    <div class="clock" id="js-clock">00:00:00</div>
+                </div>
+
+                <div class="news-list">
+                    <article class="news-item">
+                        <span class="eye-brow">Regional / Breaking</span>
+                        <a href="#" class="news-title">富士山、130年ぶりに最も遅い初冠雪を記録か。</a>
+                        <p class="news-desc">Núi Phú Sĩ có khả năng ghi nhận đợt tuyết đầu mùa muộn nhất trong vòng 130 năm qua do ảnh hưởng của nhiệt độ mùa thu cao bất thường. Sự kiện này đang thu hút sự chú ý của các chuyên gia khí hậu thế giới.</p>
+                        <div style="margin-top: 16px; display: flex; gap: 12px;">
+                            <button class="btn-red">ĐỌC CHI TIẾT</button>
+                            <span style="font-size: 0.8rem; color: var(--muted); align-self: center;">5 phút trước</span>
+                        </div>
+                    </article>
+
+                    <article class="news-item">
+                        <span class="eye-brow">Society / Trending</span>
+                        <a href="#" class="news-title">日本の「静かな退職」、若年層で広がる価値観の変化。</a>
+                        <p class="news-desc">Xu hướng "Quiet Quitting" (nghỉ việc trong âm thầm) đang lan rộng trong giới trẻ Nhật Bản. Thay vì cống hiến hết mình cho công ty, nhiều người chọn cách cân bằng cuộc sống và chỉ làm đúng trách nhiệm.</p>
+                        <div style="margin-top: 16px;">
+                            <button class="btn-red" style="background: transparent; border: 1px solid var(--accent); color: var(--accent);">PHÂN TÍCH</button>
+                        </div>
+                    </article>
+
+                    <article class="news-item">
+                        <span class="eye-brow">Eco / Life</span>
+                        <a href="#" class="news-title">リユース市場、初の3兆円突破。環境意識と物価高が背景。</a>
+                        <p class="news-desc">Thị trường đồ cũ tại Nhật Bản lần đầu tiên vượt ngưỡng 3 nghìn tỷ Yên. Sự kết hợp giữa ý thức bảo vệ môi trường và áp lực vật giá leo thang đã thúc đẩy người dân ưu tiên mua sắm hàng đã qua sử dụng.</p>
+                    </article>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Side: Trending -->
+        <aside class="side-panel">
+            <div class="panel">
+                <h3 style="font-size: 0.85rem; text-transform: uppercase; margin-bottom: 20px;">Top Topics</h3>
+                
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <span style="font-weight: 900; color: var(--accent);">01</span>
+                        <p style="font-size: 0.85rem; font-weight: 700;">#円安対策 (Giải pháp đồng Yên yếu)</p>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <span style="font-weight: 900; color: var(--accent);">02</span>
+                        <p style="font-size: 0.85rem; font-weight: 700;">#マイナ保険証 (Thẻ bảo hiểm My Number)</p>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <span style="font-weight: 900; color: var(--accent);">03</span>
+                        <p style="font-size: 0.85rem; font-weight: 700;">#2024年問題 (Vấn đề logistics 2024)</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 32px; padding: 16px; background: rgba(220, 38, 38, 0.05); border-radius: var(--radius-sm); border-left: 4px solid var(--accent);">
+                    <span class="eye-brow">Status</span>
+                    <div style="display: flex; align-items: center; font-size: 0.8rem; font-weight: 700;">
+                        <span class="status-pill"></span> Real-time Monitoring Active
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const body = document.body;
+            const isDark = body.getAttribute('data-theme') === 'dark';
+            body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            localStorage.setItem('fuji-bright-theme', isDark ? 'light' : 'dark');
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ja-JP', { 
+                timeZone: 'Asia/Tokyo', 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            document.getElementById('js-clock').innerText = timeStr + ' JST';
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        window.onload = () => {
+            if (localStorage.getItem('fuji-bright-theme') === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+            }
+        };
+    </script>
+</body>
+</html>

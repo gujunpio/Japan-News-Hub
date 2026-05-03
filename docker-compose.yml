@@ -1,0 +1,18 @@
+services:
+  japan-news-hub:
+    build: .
+    ports:
+      - "3002:3000"
+    # Chromium needs shared memory — default 64MB is too small
+    shm_size: "1g"
+    environment:
+      - NODE_ENV=production
+      - DOCKER=1
+    restart: unless-stopped
+    # Resource limits (Chromium can be memory-hungry)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
