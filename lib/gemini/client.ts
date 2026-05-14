@@ -3,10 +3,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Comment, PostItem } from "@/types";
 
+// ── Provider type ─────────────────────────────────────────────────────
+export type ApiProvider = "google" | "openrouter";
+
 // ── localStorage keys ─────────────────────────────────────────────────
 // Shared keys for both modules
 const STORAGE_KEY_API = "gemini_api_key";
+const STORAGE_KEY_OPENROUTER_API = "openrouter_api_key";
+const STORAGE_KEY_PROVIDER = "ai_provider";
 const STORAGE_KEY_MODEL = "gemini_model";
+const STORAGE_KEY_OPENROUTER_MODEL = "openrouter_model";
 const STORAGE_KEY_TRANSLATION_ENGINE = "translation_engine";
 
 // Yahoo-specific prompt keys
@@ -71,6 +77,17 @@ const LANGUAGE_NAMES: Record<string, string> = {
   ES: "Spanish",
 };
 
+// ── Provider helpers ──────────────────────────────────────────────────
+
+export function getProvider(): ApiProvider {
+  if (typeof window === "undefined") return "google";
+  return (localStorage.getItem(STORAGE_KEY_PROVIDER) as ApiProvider) ?? "google";
+}
+
+export function setProvider(provider: ApiProvider): void {
+  localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
+}
+
 // ── Shared API key/model helpers ──────────────────────────────────────
 
 export function getApiKey(): string {
@@ -82,6 +99,21 @@ export function setApiKey(key: string): void {
   localStorage.setItem(STORAGE_KEY_API, key);
 }
 
+export function getOpenRouterApiKey(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(STORAGE_KEY_OPENROUTER_API) ?? "";
+}
+
+export function setOpenRouterApiKey(key: string): void {
+  localStorage.setItem(STORAGE_KEY_OPENROUTER_API, key);
+}
+
+/** Returns the active API key based on current provider */
+export function getActiveApiKey(): string {
+  const provider = getProvider();
+  return provider === "openrouter" ? getOpenRouterApiKey() : getApiKey();
+}
+
 export function getModel(): string {
   if (typeof window === "undefined") return "gemini-2.0-flash";
   return localStorage.getItem(STORAGE_KEY_MODEL) ?? "gemini-2.0-flash";
@@ -89,6 +121,21 @@ export function getModel(): string {
 
 export function setModel(model: string): void {
   localStorage.setItem(STORAGE_KEY_MODEL, model);
+}
+
+export function getOpenRouterModel(): string {
+  if (typeof window === "undefined") return "google/gemini-2.0-flash-exp:free";
+  return localStorage.getItem(STORAGE_KEY_OPENROUTER_MODEL) ?? "google/gemini-2.0-flash-exp:free";
+}
+
+export function setOpenRouterModel(model: string): void {
+  localStorage.setItem(STORAGE_KEY_OPENROUTER_MODEL, model);
+}
+
+/** Returns the active model based on current provider */
+export function getActiveModel(): string {
+  const provider = getProvider();
+  return provider === "openrouter" ? getOpenRouterModel() : getModel();
 }
 
 export function getTranslationEngine(): "google" | "ai" {
@@ -152,7 +199,13 @@ export interface GeminiModel {
   supportedGenerationMethods: string[];
 }
 
-export async function fetchModels(apiKey: string): Promise<GeminiModel[]> {
+export async function fetchModels(apiKey: string, provider?: ApiProvider): Promise<GeminiModel[]> {
+  const p = provider ?? getProvider();
+
+  if (p === "openrouter") {
+    return fetchOpenRouterModels(apiKey);
+  }
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
   );
@@ -192,23 +245,109 @@ export async function fetchModels(apiKey: string): Promise<GeminiModel[]> {
   return models;
 }
 
-export async function testConnection(apiKey: string): Promise<boolean> {
+// ── OpenRouter model list ─────────────────────────────────────────────
+
+interface OpenRouterModelRaw {
+  id: string;
+  name: string;
+  pricing?: { prompt?: string; completion?: string };
+}
+
+async function fetchOpenRouterModels(apiKey: string): Promise<GeminiModel[]> {
+  const res = await fetch("https://openrouter.ai/api/v1/models", {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch OpenRouter models (HTTP ${res.status})`);
+  }
+
+  const data = await res.json();
+  const models: GeminiModel[] = ((data.data ?? []) as OpenRouterModelRaw[])
+    .filter((m) => m.id && m.name)
+    .map((m) => {
+      const isFree = m.pricing?.prompt === "0" || m.id.includes(":free");
+      return {
+        name: m.id,
+        displayName: m.name + (isFree ? " 🆓" : ""),
+        supportedGenerationMethods: ["generateContent"],
+      };
+    });
+
+  // Sort: free models first, then by name
+  models.sort((a, b) => {
+    const aFree = a.displayName.includes("🆓") ? 0 : 1;
+    const bFree = b.displayName.includes("🆓") ? 0 : 1;
+    if (aFree !== bFree) return aFree - bFree;
+    return a.displayName.localeCompare(b.displayName);
+  });
+
+  return models;
+}
+
+export async function testConnection(apiKey: string, provider?: ApiProvider): Promise<boolean> {
+  const p = provider ?? getProvider();
+
+  if (p === "openrouter") {
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    return res.ok;
+  }
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
   );
   return res.ok;
 }
 
-// ── Internal Gemini call ──────────────────────────────────────────────
+// ── Internal AI call (routes to Google or OpenRouter) ─────────────────
 
-async function callGemini(prompt: string, model: string): Promise<string> {
+async function callGemini(prompt: string, model?: string): Promise<string> {
+  const provider = getProvider();
+
+  if (provider === "openrouter") {
+    return callOpenRouter(prompt, model);
+  }
+
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API key not configured");
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelId = model.replace("models/", "");
+  const modelId = (model ?? getModel()).replace("models/", "");
   const genModel = genAI.getGenerativeModel({ model: modelId });
   const result = await genModel.generateContent(prompt);
   return result.response.text();
+}
+
+async function callOpenRouter(prompt: string, model?: string): Promise<string> {
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) throw new Error("OpenRouter API key not configured");
+
+  const modelId = model ?? getOpenRouterModel();
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "",
+      "X-Title": "Japan News Hub",
+    },
+    body: JSON.stringify({
+      model: modelId,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err?.error?.message ?? `OpenRouter API error (HTTP ${res.status})`
+    );
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
 }
 
 // ── Yahoo News AI functions ───────────────────────────────────────────

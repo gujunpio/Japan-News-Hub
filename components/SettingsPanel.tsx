@@ -4,8 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import {
   getApiKey,
   setApiKey,
+  getOpenRouterApiKey,
+  setOpenRouterApiKey,
   getModel,
   setModel,
+  getOpenRouterModel,
+  setOpenRouterModel,
+  getProvider,
+  setProvider,
   fetchModels,
   testConnection,
   getArticlePrompt,
@@ -21,6 +27,7 @@ import {
   DEFAULT_THREAD_PROMPT,
   DEFAULT_COMMENTS_PROMPT as DEFAULT_5CH_COMMENTS_PROMPT,
   type GeminiModel,
+  type ApiProvider,
 } from "@/lib/gemini/client";
 
 interface SettingsPanelProps {
@@ -32,9 +39,20 @@ const DEFAULT_YAHOO_ARTICLE = "以下のニュース記事を3〜5行で要約�
 const DEFAULT_YAHOO_COMMENTS = "以下のコメント一覧から主要な意見・傾向を日本語で分析・要約してください。";
 
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
-  const [apiKey, setApiKeyState] = useState("");
-  const [selectedModel, setSelectedModelState] = useState("");
-  const [models, setModels] = useState<GeminiModel[]>([]);
+  // Provider
+  const [providerState, setProviderState] = useState<ApiProvider>("google");
+
+  // Google
+  const [googleKey, setGoogleKeyState] = useState("");
+  const [googleModel, setGoogleModelState] = useState("");
+  const [googleModels, setGoogleModels] = useState<GeminiModel[]>([]);
+
+  // OpenRouter
+  const [orKey, setOrKeyState] = useState("");
+  const [orModel, setOrModelState] = useState("");
+  const [orModels, setOrModels] = useState<GeminiModel[]>([]);
+
+  // Shared
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState("");
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "error">("idle");
@@ -49,11 +67,17 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
   const [activeTab, setActiveTab] = useState<"general" | "yahoo" | "5ch">("general");
 
+  // Current key based on provider
+  const currentKey = providerState === "openrouter" ? orKey : googleKey;
+
   // Load saved settings
   useEffect(() => {
     if (open) {
-      setApiKeyState(getApiKey());
-      setSelectedModelState(getModel());
+      setProviderState(getProvider());
+      setGoogleKeyState(getApiKey());
+      setGoogleModelState(getModel());
+      setOrKeyState(getOpenRouterApiKey());
+      setOrModelState(getOpenRouterModel());
       setYahooArticlePromptState(getArticlePrompt());
       setYahooCommentsPromptState(getYahooCommentsPrompt());
       setFiveChThreadPromptState(getThreadPrompt());
@@ -62,26 +86,41 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     }
   }, [open]);
 
-  // Auto-fetch models when API key changes and looks valid
+  // Auto-fetch models when key changes
   useEffect(() => {
-    if (apiKey.length > 20) {
-      handleFetchModels();
+    if (googleKey.length > 20) {
+      handleFetchModels("google", googleKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey]);
+  }, [googleKey]);
 
-  const handleFetchModels = useCallback(async () => {
-    if (!apiKey) return;
+  useEffect(() => {
+    if (orKey.length > 20) {
+      handleFetchModels("openrouter", orKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orKey]);
+
+  const handleFetchModels = useCallback(async (p: ApiProvider, key: string) => {
+    if (!key) return;
     setModelsLoading(true);
     setModelsError("");
     try {
-      const list = await fetchModels(apiKey);
-      setModels(list);
-      // Auto-select best model if none selected
-      if (list.length > 0 && !selectedModel) {
-        const best = list[0].name;
-        setSelectedModelState(best);
-        setModel(best);
+      const list = await fetchModels(key, p);
+      if (p === "openrouter") {
+        setOrModels(list);
+        if (list.length > 0 && !orModel) {
+          const best = list[0].name;
+          setOrModelState(best);
+          setOpenRouterModel(best);
+        }
+      } else {
+        setGoogleModels(list);
+        if (list.length > 0 && !googleModel) {
+          const best = list[0].name;
+          setGoogleModelState(best);
+          setModel(best);
+        }
       }
     } catch (err) {
       setModelsError(
@@ -90,16 +129,33 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     } finally {
       setModelsLoading(false);
     }
-  }, [apiKey, selectedModel]);
+  }, [orModel, googleModel]);
 
-  const handleSaveKey = () => {
-    setApiKey(apiKey);
+  const handleProviderChange = (p: ApiProvider) => {
+    setProviderState(p);
+    setProvider(p);
+    setModelsError("");
     setTestStatus("idle");
   };
 
-  const handleModelChange = (value: string) => {
-    setSelectedModelState(value);
+  const handleSaveGoogleKey = () => {
+    setApiKey(googleKey);
+    setTestStatus("idle");
+  };
+
+  const handleSaveOrKey = () => {
+    setOpenRouterApiKey(orKey);
+    setTestStatus("idle");
+  };
+
+  const handleGoogleModelChange = (value: string) => {
+    setGoogleModelState(value);
     setModel(value);
+  };
+
+  const handleOrModelChange = (value: string) => {
+    setOrModelState(value);
+    setOpenRouterModel(value);
   };
 
   const handleTranslationEngineChange = (value: "google" | "ai") => {
@@ -110,7 +166,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const handleTest = async () => {
     setTestStatus("testing");
     try {
-      const ok = await testConnection(apiKey);
+      const ok = await testConnection(currentKey, providerState);
       setTestStatus(ok ? "ok" : "error");
     } catch {
       setTestStatus("error");
@@ -128,6 +184,11 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   };
 
   if (!open) return null;
+
+  // Determine which models/model to show
+  const activeModels = providerState === "openrouter" ? orModels : googleModels;
+  const activeModel = providerState === "openrouter" ? orModel : googleModel;
+  const handleModelChange = providerState === "openrouter" ? handleOrModelChange : handleGoogleModelChange;
 
   return (
     <>
@@ -164,41 +225,104 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
         {activeTab === "general" && (
           <>
+            {/* Provider selector */}
             <div className="settings-section">
-              <label className="input-label" htmlFor="settings-api-key">
-                Google AI Studio API Key
-              </label>
-              <div className="settings-key-row">
-                <input
-                  id="settings-api-key"
-                  className="input-field"
-                  type={showKey ? "text" : "password"}
-                  placeholder="AIzaSy..."
-                  value={apiKey}
-                  onChange={(e) => setApiKeyState(e.target.value)}
-                  onBlur={handleSaveKey}
-                />
+              <label className="input-label">AI Provider</label>
+              <div style={{ display: "flex", gap: "8px" }}>
                 <button
-                  className="settings-toggle-btn"
-                  onClick={() => setShowKey(!showKey)}
-                  title={showKey ? "Hide" : "Show"}
+                  className={`btn ${providerState === "google" ? "btn-primary" : "btn-secondary"}`}
+                  style={{ flex: 1, fontSize: "13px", padding: "10px 12px" }}
+                  onClick={() => handleProviderChange("google")}
                 >
-                  {showKey ? "🙈" : "👁️"}
+                  🔵 Google AI Studio
+                </button>
+                <button
+                  className={`btn ${providerState === "openrouter" ? "btn-primary" : "btn-secondary"}`}
+                  style={{ flex: 1, fontSize: "13px", padding: "10px 12px" }}
+                  onClick={() => handleProviderChange("openrouter")}
+                >
+                  🟠 OpenRouter
                 </button>
               </div>
-              <p className="settings-hint">
-                Get a free key at{" "}
-                <a
-                  href="https://aistudio.google.com/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  aistudio.google.com
-                </a>
-                . Stored locally.
-              </p>
             </div>
 
+            {/* API Key — Google */}
+            {providerState === "google" && (
+              <div className="settings-section">
+                <label className="input-label" htmlFor="settings-api-key">
+                  Google AI Studio API Key
+                </label>
+                <div className="settings-key-row">
+                  <input
+                    id="settings-api-key"
+                    className="input-field"
+                    type={showKey ? "text" : "password"}
+                    placeholder="AIzaSy..."
+                    value={googleKey}
+                    onChange={(e) => setGoogleKeyState(e.target.value)}
+                    onBlur={handleSaveGoogleKey}
+                  />
+                  <button
+                    className="settings-toggle-btn"
+                    onClick={() => setShowKey(!showKey)}
+                    title={showKey ? "Hide" : "Show"}
+                  >
+                    {showKey ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <p className="settings-hint">
+                  Get a free key at{" "}
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    aistudio.google.com
+                  </a>
+                  . Stored locally.
+                </p>
+              </div>
+            )}
+
+            {/* API Key — OpenRouter */}
+            {providerState === "openrouter" && (
+              <div className="settings-section">
+                <label className="input-label" htmlFor="settings-or-key">
+                  OpenRouter API Key
+                </label>
+                <div className="settings-key-row">
+                  <input
+                    id="settings-or-key"
+                    className="input-field"
+                    type={showKey ? "text" : "password"}
+                    placeholder="sk-or-v1-..."
+                    value={orKey}
+                    onChange={(e) => setOrKeyState(e.target.value)}
+                    onBlur={handleSaveOrKey}
+                  />
+                  <button
+                    className="settings-toggle-btn"
+                    onClick={() => setShowKey(!showKey)}
+                    title={showKey ? "Hide" : "Show"}
+                  >
+                    {showKey ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <p className="settings-hint">
+                  Get your key at{" "}
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    openrouter.ai/keys
+                  </a>
+                  . Supports 200+ models including free tiers. Stored locally.
+                </p>
+              </div>
+            )}
+
+            {/* Model selector */}
             <div className="settings-section">
               <label className="input-label" htmlFor="settings-model">
                 Model
@@ -212,21 +336,21 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   {modelsError}
                   <button
                     className="settings-retry-btn"
-                    onClick={handleFetchModels}
+                    onClick={() => handleFetchModels(providerState, currentKey)}
                   >
                     Retry
                   </button>
                 </div>
-              ) : models.length > 0 ? (
+              ) : activeModels.length > 0 ? (
                 <select
                   id="settings-model"
                   className="input-field"
-                  value={selectedModel}
+                  value={activeModel}
                   onChange={(e) => handleModelChange(e.target.value)}
                 >
-                  {models.map((m) => (
+                  {activeModels.map((m) => (
                     <option key={m.name} value={m.name}>
-                      {m.displayName} ({m.name.replace("models/", "")})
+                      {m.displayName} ({providerState === "openrouter" ? m.name : m.name.replace("models/", "")})
                     </option>
                   ))}
                 </select>
@@ -248,7 +372,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 onChange={(e) => handleTranslationEngineChange(e.target.value as "google" | "ai")}
               >
                 <option value="google">Google Translate (Fast, Default)</option>
-                <option value="ai">Gemini AI (Accurate, Uses API Key)</option>
+                <option value="ai">AI Translation (Accurate, Uses API Key)</option>
               </select>
               <p className="settings-hint">
                 Choose the service used for translating articles and comments.
@@ -260,7 +384,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 id="btn-test-connection"
                 className="btn btn-secondary"
                 onClick={handleTest}
-                disabled={!apiKey || testStatus === "testing"}
+                disabled={!currentKey || testStatus === "testing"}
                 style={{ width: "100%" }}
               >
                 {testStatus === "testing" ? (
@@ -268,7 +392,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     <span className="spinner" /> Testing…
                   </>
                 ) : (
-                  <>🔌 Test Connection</>
+                  <>🔌 Test Connection ({providerState === "openrouter" ? "OpenRouter" : "Google"})</>
                 )}
               </button>
 
