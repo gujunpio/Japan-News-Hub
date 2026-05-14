@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  summarizeThread, analyzeComments, translateText, getModel,
+  summarizeThread, analyzeComments, translateText, getActiveModel,
   SUPPORTED_LANGUAGES,
 } from "@/lib/gemini/client";
 import type { ThreadData, PostsData } from "@/types";
@@ -103,7 +103,7 @@ export default function FiveChScraper({ setSettingsOpen }: FiveChScraperProps) {
     setIsGeminiLoading("thread");
     setGeminiThreadTr("");
     try {
-      const result = await summarizeThread(threadData.title, threadData.opContent, getModel());
+      const result = await summarizeThread(threadData.title, threadData.opContent, getActiveModel());
       setGeminiThreadResult(result);
     } catch (e) {
       setError((e as Error).message);
@@ -117,7 +117,7 @@ export default function FiveChScraper({ setSettingsOpen }: FiveChScraperProps) {
     setIsGeminiLoading("comments");
     setGeminiCommentsTr("");
     try {
-      const result = await analyzeComments(postsData.posts, threadData.title, getModel());
+      const result = await analyzeComments(postsData.posts, threadData.title, getActiveModel());
       setGeminiCommentsResult(result);
     } catch (e) {
       setError((e as Error).message);
@@ -131,7 +131,7 @@ export default function FiveChScraper({ setSettingsOpen }: FiveChScraperProps) {
     setIsTranslatingThread(true);
     try {
       const text = `${threadData.title}\n\n${threadData.opContent}`;
-      const tr = await translateText(text, targetLang, getModel());
+      const tr = await translateText(text, targetLang, getActiveModel());
       setThreadTranslation(tr);
     } catch (e) {
       setError((e as Error).message);
@@ -144,7 +144,7 @@ export default function FiveChScraper({ setSettingsOpen }: FiveChScraperProps) {
     if (!geminiThreadResult) return;
     setIsTranslatingGThread(true);
     try {
-      const tr = await translateText(geminiThreadResult, targetLang, getModel());
+      const tr = await translateText(geminiThreadResult, targetLang, getActiveModel());
       setGeminiThreadTr(tr);
     } catch (e) {
       setError((e as Error).message);
@@ -157,7 +157,7 @@ export default function FiveChScraper({ setSettingsOpen }: FiveChScraperProps) {
     if (!geminiCommentsResult) return;
     setIsTranslatingGComments(true);
     try {
-      const tr = await translateText(geminiCommentsResult, targetLang, getModel());
+      const tr = await translateText(geminiCommentsResult, targetLang, getActiveModel());
       setGeminiCommentsTr(tr);
     } catch (e) {
       setError((e as Error).message);
@@ -270,7 +270,7 @@ export default function FiveChScraper({ setSettingsOpen }: FiveChScraperProps) {
                 className={`tab ${activeTab === "gemini" ? "active" : ""}`}
                 onClick={() => setActiveTab("gemini")}
               >
-                Gemini Analysis
+                Analysis
               </button>
             </div>
 

@@ -3,8 +3,8 @@
 import { useState, useCallback } from "react";
 import { translateText } from "@/lib/translate";
 import {
-  getApiKey,
-  getModel,
+  getActiveApiKey,
+  getActiveModel,
   summarizeArticle,
   summarizeComments,
 } from "@/lib/gemini/client";
@@ -180,13 +180,13 @@ export default function YahooScraper({ setSettingsOpen }: YahooScraperProps) {
   }, [url, selectedPages]);
 
   const handleGeminiArticle = useCallback(async () => {
-    if (!getApiKey()) { setSettingsOpen(true); return; }
+    if (!getActiveApiKey()) { setSettingsOpen(true); return; }
     if (!articleData?.body) return;
     setGeminiArticleStatus("loading");
     setGeminiArticleError("");
     setGeminiArticleResult("");
     try {
-      const result = await summarizeArticle(articleData.body, getModel());
+      const result = await summarizeArticle(articleData.body, getActiveModel());
       setGeminiArticleResult(result);
       setGeminiArticleStatus("success");
     } catch (err) {
@@ -196,13 +196,13 @@ export default function YahooScraper({ setSettingsOpen }: YahooScraperProps) {
   }, [articleData, setSettingsOpen]);
 
   const handleGeminiComments = useCallback(async () => {
-    if (!getApiKey()) { setSettingsOpen(true); return; }
+    if (!getActiveApiKey()) { setSettingsOpen(true); return; }
     if (!commentsData?.comments?.length) return;
     setGeminiCommentsStatus("loading");
     setGeminiCommentsError("");
     setGeminiCommentsResult("");
     try {
-      const result = await summarizeComments(commentsData.comments, getModel());
+      const result = await summarizeComments(commentsData.comments, getActiveModel());
       setGeminiCommentsResult(result);
       setGeminiCommentsStatus("success");
     } catch (err) {
@@ -225,7 +225,7 @@ export default function YahooScraper({ setSettingsOpen }: YahooScraperProps) {
   const clearAllPages = () => setSelectedPages([]);
 
   const isLoading = scrapeStatus === "loading" || commentsStatus === "loading" || commentInfoStatus === "loading";
-  const hasApiKey = !!getApiKey();
+  const hasApiKey = !!getActiveApiKey();
 
   return (
     <div className="main-grid">
@@ -323,16 +323,16 @@ export default function YahooScraper({ setSettingsOpen }: YahooScraperProps) {
         )}
 
         <div className="card">
-          <div className="card-title"><span className="icon">✨</span> Gemini AI</div>
+          <div className="card-title"><span className="icon">✨</span> AI Analysis</div>
           {hasApiKey ? (
             <p className="settings-hint" style={{ margin: 0 }}>
-              ✓ API key configured. Use the Gemini tab to analyze.
+              ✓ API key configured. Use the Analysis tab to analyze.
             </p>
           ) : (
             <p className="settings-hint" style={{ margin: 0 }}>
               Set up your API key in{" "}
               <button onClick={() => setSettingsOpen(true)} className="link-btn">Settings</button>
-              {" "}to enable Gemini analysis.
+              {" "}to enable AI analysis.
             </p>
           )}
         </div>
@@ -344,7 +344,7 @@ export default function YahooScraper({ setSettingsOpen }: YahooScraperProps) {
             {([
               { key: "article", label: "📄 Article", badge: null },
               { key: "comments", label: "💬 Comments", badge: commentsData ? `${commentsData.totalFetched}` : null },
-              { key: "gemini", label: "✨ Gemini", badge: null },
+              { key: "gemini", label: "✨ Analysis", badge: null },
             ] as const).map((t) => (
               <button
                 key={t.key}
@@ -524,7 +524,7 @@ function GeminiTab({
           <div>
             <h3 className="gemini-section-title">📝 Summarize Article</h3>
             <p className="gemini-section-desc">
-              {articleData ? "Generate a concise summary using Gemini AI." : "Scrape an article first."}
+              {articleData ? "Generate a concise summary using AI." : "Scrape an article first."}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>

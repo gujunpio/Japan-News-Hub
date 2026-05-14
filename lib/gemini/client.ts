@@ -441,7 +441,7 @@ export async function translateText(
 
   // Use Gemini AI
   const langName = LANGUAGE_NAMES[targetLang.toUpperCase()] ?? targetLang;
-  const m = model ?? getModel();
+  const m = model ?? getActiveModel();
   const prompt = `Translate to ${langName}. Keep formatting. Output only translation.
 
 ${text}`;
