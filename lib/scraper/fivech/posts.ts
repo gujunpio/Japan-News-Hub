@@ -21,7 +21,7 @@ export async function scrapePosts(
 
   const allPosts: PostItem[] = []
 
-  $('div.post, div[class*="post"]').each((_, el) => {
+  $('div.post').each((_, el) => {
     const numText = $(el)
       .find('.number, .postnum, [class*="number"], .postid')
       .first()

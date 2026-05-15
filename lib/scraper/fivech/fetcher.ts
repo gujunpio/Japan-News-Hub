@@ -9,11 +9,23 @@ function randomDelay(minMs: number = 500, maxMs: number = 1200): Promise<void> {
 export async function fetchHtml(url: string): Promise<string> {
   await randomDelay()
 
+  // Normalize URL to always fetch all comments (append /1- to the base thread URL)
+  let fetchUrl = url
+  try {
+    const parsed = new URL(url)
+    const match = parsed.pathname.match(/(\/test\/read\.cgi\/[^/]+\/\d+)/)
+    if (match) {
+      fetchUrl = `${parsed.origin}${match[1]}/1-`
+    }
+  } catch {
+    // Keep original URL if parsing fails
+  }
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 15_000)
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(fetchUrl, {
       signal: controller.signal,
       redirect: 'follow',
       headers: {

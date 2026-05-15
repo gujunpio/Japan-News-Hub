@@ -40,28 +40,32 @@ export async function scrapeThread(url: string): Promise<ThreadData> {
     }
   }
 
-  let totalPosts = 0
-  const bodyText = $('body').text()
-  const postCountPatterns = [
-    /全\s*(\d+)\s*レス/,
-    /(\d+)\s*件のレス/,
-    /(\d+)\s*レス/,
-    /レス数[：:]\s*(\d+)/,
-  ]
+  // Primary: count actual post elements (most reliable)
+  let totalPosts = $('div.post').length
 
-  for (const pattern of postCountPatterns) {
-    const m = bodyText.match(pattern)
-    if (m) {
-      totalPosts = parseInt(m[1], 10)
-      break
-    }
-  }
-
+  // Fallback: try other element selectors
   if (totalPosts === 0) {
     totalPosts =
-      $('div.post, .res, dt').length ||
+      $('.res, dt').length ||
       $('[id^="res"], [id^="post"]').length ||
       $('article').length
+  }
+
+  // Last resort: regex patterns from body text
+  if (totalPosts === 0) {
+    const bodyText = $('body').text()
+    const postCountPatterns = [
+      /全\s*(\d+)\s*レス/,
+      /(\d+)\s*件のレス/,
+      /レス数[：:]\s*(\d+)/,
+    ]
+    for (const pattern of postCountPatterns) {
+      const m = bodyText.match(pattern)
+      if (m) {
+        totalPosts = parseInt(m[1], 10)
+        break
+      }
+    }
   }
 
   let opContent = ''
